@@ -18,11 +18,37 @@ namespace Snake
 
             long lastFrame = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
+            int fieldSize = 5;
+            int startLength = 2;
+
             while (true)
             {
 
                 string frame;
 
+                // add edges
+                for (int row = 0; row < fieldSize + 2; row++)
+                {
+                    for (int col = 0; col < fieldSize + 2; col++)
+                    {
+                        int state = isEdge(row, fieldSize) ? 1 : 0 + isEdge(col, fieldSize) ? 1 : 0;
+                        if (isEdge(row, fieldSize) && isEdge(col, fieldSize))
+                        {
+                            frame += "+";
+                            continue;
+                        }
+                        if (isEdge(row, fieldSize))
+                        {
+                            frame += "-";
+                            continue;
+                        }
+                        if (isEdge(col, fieldSize))
+                        {
+                            frame += "|";
+                            continue;
+                        }
+                    }
+                }
 
 
                 int timeSinceLastFrame = (int) (DateTimeOffset.Now.ToUnixTimeMilliseconds() - lastFrame);
@@ -39,6 +65,12 @@ namespace Snake
             }
 
         }
+
+        private static bool isEdge(int coord, int fieldSize)
+        {
+            return coord == 0 || coord == fieldSize + 1;
+        }
+
     }
 
     internal class Game
@@ -54,10 +86,10 @@ namespace Snake
 
     }
 
-    internal class QueueMap<T, K>
+    internal class QueueMap<T>
     {
 
-        private Queue<> map;
+        private Queue<T> queue;
         private int deleteAt;
 
         public QueueMap(int size)
@@ -65,11 +97,11 @@ namespace Snake
             this.deleteAt = size;
         }
 
-        public void add(T key, K value) 
+        public void add(T value) 
         {
             if (map.Count() == deleteAt)
             {
-
+                queue.Dequeue()
             }
         }
     }

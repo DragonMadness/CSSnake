@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -22,7 +23,7 @@ namespace Snake
             Console.WriteLine("frame delay is " + delay);
 
             int fieldSize = 15;
-            int startLength = 3;
+            int startLength = 5;
 
             Game game = new Game(fieldSize, startLength);
 
@@ -37,18 +38,22 @@ namespace Snake
             while (isRunning)
             {
 
-                Console.WriteLine(lastPressedKey.ToString());
                 Vector2 direction = GetDirection(lastPressedKey);
                 if (!game.TryMove(direction))
                 {
                     Console.WriteLine("You lost!");
-                    return;
+                    break;
+                }
+
+                if (!game.HasFruit() && !game.SpawnFruit())
+                {
+                    Console.WriteLine("You won!");
+                    break;
                 }
 
                 string frame = game.Draw();
 
                 int timeSinceLastFrame = (int) (DateTimeOffset.Now.ToUnixTimeMilliseconds() - lastFrame);
-                Console.WriteLine(timeSinceLastFrame);
                 if (timeSinceLastFrame < delay) {
                     Thread.Sleep((int)(delay - timeSinceLastFrame));
                 }
@@ -73,16 +78,17 @@ namespace Snake
                 }
             }
             );
+            thread.Start();
         }
 
         public static Vector2 GetDirection(ConsoleKey key)
         {
             switch (key)
             {
-                case ConsoleKey.UpArrow: return new Vector2(-1, 0);
-                case ConsoleKey.DownArrow: return new Vector2(1, 0);
-                case ConsoleKey.RightArrow: return new Vector2(0, 1);
-                case ConsoleKey.LeftArrow: return new Vector2(0, -1);
+                case ConsoleKey.UpArrow: return new Vector2(0, -1);
+                case ConsoleKey.DownArrow: return new Vector2(0, 1);
+                case ConsoleKey.RightArrow: return new Vector2(1, 0);
+                case ConsoleKey.LeftArrow: return new Vector2(-1, 0);
                 default: return new Vector2(0, 0);
             }
         }
@@ -120,6 +126,41 @@ namespace Snake
             return field.Length;
         }
 
+        public bool HasFruit()
+        {
+            for (int row = 0; row < this.field.Length; row++)
+            {
+                for (int col = 0; col < this.field[row].Length; col++)
+                {
+                    if (this.field[row][col] == 2) return true;
+                }
+            }
+            return false;
+        }
+
+        public bool SpawnFruit()
+        {
+
+            List<Vector2> emptyCells = new List<Vector2>();
+
+            for (int row = 0; row < this.field.Length; row++)
+            {
+                for (int col = 0; col < this.field[row].Length; col++)
+                {
+                    if (this.field[row][col] == 0)
+                    {
+                        emptyCells.Add(new Vector2(row, col));
+                    }
+                }
+            }
+
+            if (emptyCells.Count == 0) return false;
+
+            Vector2 randCell = Choice<Vector2>(emptyCells);
+            this.field[(int) randCell.X][(int) randCell.Y] = 2;
+            return true;
+        }
+
         public string Draw()
         {
             string frame = "";
@@ -147,7 +188,25 @@ namespace Snake
                     }
 
                     // Field
-                    frame += this.field[row - 1][col - 1] == 0 ? "   " : " ■ ";
+                    int cellData = this.field[row - 1][col - 1];
+                    switch (cellData)
+                    {
+                        case 0:
+                            {
+                                frame += "   ";
+                                break;
+                            }
+                        case 1:
+                            {
+                                frame += " ■ ";
+                                break;
+                            }
+                        case 2:
+                            {
+                                frame += " □ ";
+                                break;
+                            }
+                    }
                 }
                 frame += "\n";
             }
@@ -161,6 +220,12 @@ namespace Snake
             SnakeTile next = head.GetNext();
             if (IsInside(next.GetPosition(), GetFieldSize()))
             {
+
+                if (this.field[(int) next.GetPosition().Y][(int) next.GetPosition().X] == 2)
+                {
+                    Console.WriteLine(this.snake.SetLength(this.snake.AddLength()));
+                }
+
                 this.field[(int) next.GetPosition().Y][(int) next.GetPosition().X] = 1;
                 SnakeTile tail = this.snake.Add(next);
                 if (tail != null)
@@ -182,6 +247,12 @@ namespace Snake
         private static bool IsInside(Vector2 pos, int fieldSize)
         {
             return pos.X > 0 && pos.X < fieldSize && pos.Y > 0 && pos.Y < fieldSize;
+        }
+
+        private static T Choice<T>(List<T> collection)
+        {
+            if (collection.Count == 0) return default(T);
+            return collection[Random.Shared.Next(0, collection.Count)];
         }
     }
 
@@ -207,6 +278,12 @@ namespace Snake
         public int SetLength(int newLength)
         {
             return this.length = newLength;
+        }
+
+        public int AddLength()
+        {
+            this.length++;
+            return this.length;
         }
 
         public SnakeTile Add(SnakeTile value) 

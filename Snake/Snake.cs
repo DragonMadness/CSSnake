@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -13,6 +16,7 @@ namespace Snake
         public static Vector2[] directions = new Vector2[4] { new Vector2(0, -1), new Vector2(0, 1), new Vector2(-1, 0), new Vector2(1, 0) };
         public static bool isRunning = true;
         public static ConsoleKey lastPressedKey = ConsoleKey.Delete;
+        public static Thread keyListener;
 
         static void Main()
         {
@@ -25,30 +29,43 @@ namespace Snake
             int startLength = 3;
 
             Game game = new Game(fieldSize, startLength);
-
-            Console.WriteLine("-------------------------------------Console snake-------------------------------------");
-            Console.WriteLine("===================================by DragonMadness_===================================");
-            Console.WriteLine("-----------------------------------PRESS ANY  BUTTON-----------------------------------");
-            Console.ReadKey();
-
-            StartKeyListener();
             long lastFrame = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+
+            bool isInitial = true;
 
             while (isRunning)
             {
+
+                if (isInitial)
+                {
+                    Console.WriteLine("-------------------------------------Console snake-------------------------------------");
+                    Console.WriteLine("===================================by DragonMadness_===================================");
+                    Console.WriteLine("-----------------------------------PRESS ANY  BUTTON-----------------------------------");
+                    Console.ReadKey();
+
+                    StartKeyListener();
+                    isInitial = false;
+                }
 
                 Console.WriteLine(lastPressedKey.ToString());
                 Vector2 direction = GetDirection(lastPressedKey);
                 if (!game.TryMove(direction))
                 {
-                    Console.WriteLine("You lost!");
+                    isRunning = false;
+                    keyListener.Join();
+                    Console.WriteLine("You lost! Wanna try again? (y/n)");
+                    char response = Console.ReadKey().KeyChar;
+                    if (response == 'y') 
+                    {
+                        isRunning = true;
+                        continue;
+                    }
                     return;
                 }
 
                 string frame = game.Draw();
 
                 int timeSinceLastFrame = (int) (DateTimeOffset.Now.ToUnixTimeMilliseconds() - lastFrame);
-                Console.WriteLine(timeSinceLastFrame);
                 if (timeSinceLastFrame < delay) {
                     Thread.Sleep((int)(delay - timeSinceLastFrame));
                 }
@@ -64,15 +81,15 @@ namespace Snake
 
         private static void StartKeyListener()
         {
-            Thread thread = new Thread(() =>
+            keyListener = new Thread(() =>
             {
-                Console.WriteLine("Listening for key presses");
                 while (isRunning)
                 {
                     lastPressedKey = Console.ReadKey(true).Key;
                 }
             }
             );
+            keyListener.Start();
         }
 
         public static Vector2 GetDirection(ConsoleKey key)
@@ -137,7 +154,7 @@ namespace Snake
                     }
                     if (isEdge(row, fieldSize))
                     {
-                        frame += "---";
+                        frame += "-";
                         continue;
                     }
                     if (isEdge(col, fieldSize))
@@ -147,7 +164,7 @@ namespace Snake
                     }
 
                     // Field
-                    frame += this.field[row - 1][col - 1] == 0 ? "   " : " ■ ";
+                    frame += this.field[row - 1][col - 1] == 0 ? " " : "■";
                 }
                 frame += "\n";
             }
@@ -155,23 +172,23 @@ namespace Snake
             return frame;
         }
 
-        public bool TryMove(Vector2 overrideDirection) {
+        public bool TryMove(Vector2 overrideDirection)
+        {
             SnakeTile head = this.snake.GetHead();
-            if (overrideDirection.X != 0 || overrideDirection.Y != 0) { head.SetDirection(overrideDirection); }
+            Vector2 originalDirection = head.GetDirection();
+            if ((overrideDirection.X != 0 || overrideDirection.Y != 0) && 
+                field[(int) (head.GetPosition().X + overrideDirection.X)][(int) (head.GetPosition().Y + overrideDirection.Y)] == 0) { head.SetDirection(overrideDirection); }
             SnakeTile next = head.GetNext();
-            if (IsInside(next.GetPosition(), GetFieldSize()))
+
+            if (!IsInside(next.GetPosition(), GetFieldSize())) return false;
+
+            this.field[(int)next.GetPosition().X][(int)next.GetPosition().Y] = 1;
+            SnakeTile tail = this.snake.Add(next);
+            if (tail != null)
             {
-                this.field[(int) next.GetPosition().Y][(int) next.GetPosition().X] = 1;
-                SnakeTile tail = this.snake.Add(next);
-                if (tail != null)
-                {
-                    this.field[(int)tail.GetPosition().Y][(int)tail.GetPosition().X] = 0;
-                }
-                return true;
-            } else
-            {
-                return false;
+                this.field[(int)tail.GetPosition().X][(int)tail.GetPosition().Y] = 0;
             }
+            return true;
         }
 
         private static bool isEdge(int coord, int fieldSize)
@@ -181,6 +198,7 @@ namespace Snake
 
         private static bool IsInside(Vector2 pos, int fieldSize)
         {
+            Console.WriteLine(); // debug upper bound
             return pos.X > 0 && pos.X < fieldSize && pos.Y > 0 && pos.Y < fieldSize;
         }
     }
